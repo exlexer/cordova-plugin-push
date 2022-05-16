@@ -285,25 +285,12 @@
             NSDictionary *dict = [[NSDictionary alloc] initWithContentsOfFile:path];
             fcmSenderId = [dict objectForKey:@"GCM_SENDER_ID"];
             BOOL isGcmEnabled = [[dict valueForKey:@"IS_GCM_ENABLED"] boolValue];
-
-            id forceAPNS = [iosOptions objectForKey:@"forceAPNS"];
           
             NSLog(@"FCM Sender ID %@", fcmSenderId);
 
             //  GCM options
             [self setFcmSenderId: fcmSenderId];
-            if(isGcmEnabled && [[self fcmSenderId] length] > 0 && ![forceAPNS isEqualToString:@"true"]) {
-                NSLog(@"Using FCM Notification");
-                [self setUsesFCM: YES];
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    if([FIRApp defaultApp] == nil)
-                        [FIRApp configure];
-                    [self initRegistration];
-                });
-            } else {
-                NSLog(@"Using APNS Notification");
-                [self setUsesFCM:NO];
-            }
+            [self setUsesFCM:NO];
             id fcmSandboxArg = [iosOptions objectForKey:@"fcmSandbox"];
 
             [self setFcmSandbox:@NO];
