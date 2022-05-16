@@ -31,7 +31,7 @@
 
 @import Firebase;
 @import FirebaseCore;
-// @import FirebaseInstanceID;
+@import FirebaseInstanceID;
 @import FirebaseMessaging;
 
 @implementation PushPlugin : CDVPlugin
@@ -55,15 +55,15 @@
 
 -(void)initRegistration;
 {
-    [[FIRMessaging messaging] tokenWithCompletion:^(NSString *token, NSError *error) {
+    [[FIRInstanceID instanceID] instanceIDWithHandler:^(FIRInstanceIDResult * _Nullable result, NSError * _Nullable error) {
         if (error != nil) {
             NSLog(@"Error getting FCM registration token: %@", error);
         } else {
-            NSLog(@"FCM registration token: %@", token);
+            NSLog(@"FCM registration token: %@", result.token);
 
-            [self setFcmRegistrationToken: token];
+            [self setFcmRegistrationToken: result.token];
 
-            NSString* message = [NSString stringWithFormat:@"Remote InstanceID token: %@", token];
+            NSString* message = [NSString stringWithFormat:@"Remote InstanceID token: %@", result.token];
 
             id topics = [self fcmTopics];
             if (topics != nil) {
@@ -74,7 +74,7 @@
                 }
             }
 
-            [self registerWithToken: token];
+            [self registerWithToken: result.token];
         }
     }];
 }
@@ -90,12 +90,26 @@
 }
 
 // contains error info
+- (void)sendDataMessageFailure:(NSNotification *)notification {
+    NSLog(@"sendDataMessageFailure");
+}
+- (void)sendDataMessageSuccess:(NSNotification *)notification {
+    NSLog(@"sendDataMessageSuccess");
+}
+
 - (void)didSendDataMessageWithID:messageID {
     NSLog(@"didSendDataMessageWithID");
 }
 
 - (void)willSendDataMessageWithID:messageID error:error {
     NSLog(@"willSendDataMessageWithID");
+}
+
+- (void)didDeleteMessagesOnServer {
+    NSLog(@"didDeleteMessagesOnServer");
+    // Some messages sent to this device were deleted on the GCM server before reception, likely
+    // because the TTL expired. The client should notify the app server of this, so that the app
+    // server can resend those messages.
 }
 
 - (void)unregister:(CDVInvokedUrlCommand*)command;
@@ -164,8 +178,20 @@
     } else {
         NSLog(@"Push Plugin VoIP missing or false");
         [[NSNotificationCenter defaultCenter]
-          addObserver:self selector:@selector(onTokenRefresh)
-          name:FIRMessagingRegistrationTokenRefreshedNotification object:nil];
+         addObserver:self selector:@selector(onTokenRefresh)
+         name:kFIRInstanceIDTokenRefreshNotification object:nil];
+
+        [[NSNotificationCenter defaultCenter]
+         addObserver:self selector:@selector(sendDataMessageFailure:)
+         name:FIRMessagingSendErrorNotification object:nil];
+
+        [[NSNotificationCenter defaultCenter]
+         addObserver:self selector:@selector(sendDataMessageSuccess:)
+         name:FIRMessagingSendSuccessNotification object:nil];
+
+        [[NSNotificationCenter defaultCenter]
+         addObserver:self selector:@selector(didDeleteMessagesOnServer)
+         name:FIRMessagingMessagesDeletedNotification object:nil];
 
         [self.commandDelegate runInBackground:^ {
             NSLog(@"Push Plugin register called");
